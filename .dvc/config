@@ -1,0 +1,4 @@
+[core]
+    remote = labstore
+['remote "labstore"']
+    url = s3://aitc-day21-trandainhan-2a202602642/dvc
