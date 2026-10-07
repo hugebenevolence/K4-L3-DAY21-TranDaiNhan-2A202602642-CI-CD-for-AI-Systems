@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Minimal EC2 inference VM for the Adult Income CI/CD lab.
+
+Parameters:
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  AmiId:
+    Type: AWS::EC2::Image::Id
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+  ArtifactBucket:
+    Type: String
+
+Resources:
+  ModelReadRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ReadLabArtifacts
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${ArtifactBucket}/artifacts/current/*'
+                  - !Sub 'arn:aws:s3:::${ArtifactBucket}/bootstrap/*'
+
+  ModelReadProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref ModelReadRole]
+
+  ApiSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SSH deployment and public lab API
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+
+  ApiInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: t3.micro
+      KeyName: !Ref KeyName
+      IamInstanceProfile: !Ref ModelReadProfile
+      CreditSpecification:
+        CPUCredits: standard
+      MetadataOptions:
+        HttpTokens: required
+      NetworkInterfaces:
+        - DeviceIndex: '0'
+          AssociatePublicIpAddress: true
+          DeleteOnTermination: true
+          SubnetId: !Ref SubnetId
+          GroupSet: [!Ref ApiSecurityGroup]
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 12
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: true
+      Tags:
+        - Key: Name
+          Value: aitc-day21-income-api
+        - Key: Project
+          Value: aitc-day21-income-lab
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          exec > >(tee /var/log/income-bootstrap.log | logger -t user-data -s 2>/dev/console) 2>&1
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y python3-venv
+          sudo -u ubuntu python3 -m venv /home/ubuntu/income-api-venv
+          sudo -u ubuntu /home/ubuntu/income-api-venv/bin/pip install --no-cache-dir fastapi==0.111.0 uvicorn==0.29.0 scikit-learn==1.4.2 pandas==2.2.2 joblib==1.4.2 'boto3>=1.34,<2'
+          install -d -o ubuntu -g ubuntu /home/ubuntu/src /home/ubuntu/models
+          /home/ubuntu/income-api-venv/bin/python - <<'PY'
+          import boto3
+          s3 = boto3.client('s3', region_name='us-east-1')
+          s3.download_file('${ArtifactBucket}', 'bootstrap/serve.py', '/home/ubuntu/src/serve.py')
+          s3.download_file('${ArtifactBucket}', 'bootstrap/income-api.service', '/etc/systemd/system/income-api.service')
+          PY
+          chown ubuntu:ubuntu /home/ubuntu/src/serve.py
+          systemctl daemon-reload
+          systemctl enable --now income-api.service
+
+Outputs:
+  InstanceId:
+    Value: !Ref ApiInstance
+  PublicIp:
+    Value: !GetAtt ApiInstance.PublicIp

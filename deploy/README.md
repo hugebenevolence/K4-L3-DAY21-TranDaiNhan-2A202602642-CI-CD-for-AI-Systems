@@ -1,37 +1,35 @@
-# AWS VM setup for this lab
+# EC2 deployment for the lab
 
-The workflow deploys to an existing Ubuntu VM over SSH. The current AWS identity
-can access S3 but cannot create or inspect EC2 instances, so this setup must be
-run when an EC2-capable identity or an existing VM is available.
+The deployed stack is `aitc-day21-income-api` in `us-east-1`. Its CloudFormation
+template is [`ec2-lab.yml`](ec2-lab.yml). It creates a small Ubuntu 24.04 EC2
+instance, a security group for SSH and TCP 8080, and an instance role limited to
+reading this lab's S3 model and bootstrap files. The separate stopped `Thanks-app`
+instance is unrelated to this lab.
 
-1. Give the VM an instance role with `s3:GetObject` for
-   `arn:aws:s3:::aitc-day21-trandainhan-2a202602642/artifacts/current/*`.
-   Allow SSH from the GitHub runner and TCP 8080 for the API in the security group.
-2. On the VM, prepare the service environment:
+Current public IP: `44.211.49.198`. EC2 assigns a new public IP after a stop/start;
+if that happens, update the GitHub `SERVER_HOST` secret before rerunning CI.
 
-   ```bash
-   sudo apt update
-   sudo apt install -y python3-venv
-   python3 -m venv ~/income-api-venv
-   ~/income-api-venv/bin/pip install fastapi==0.111.0 uvicorn==0.29.0 scikit-learn==1.4.2 pandas==2.2.2 joblib==1.4.2 'boto3>=1.34,<2'
-   mkdir -p ~/src ~/models
-   ```
+The boot script installs the API environment, copies `bootstrap/serve.py` and
+`bootstrap/income-api.service` from S3, and starts `income-api`. The Release job
+publishes the newly approved model to `artifacts/current/`, copies `src/serve.py`
+over SSH, restarts the service, and checks `/healthz`.
 
-3. Copy `src/serve.py` to `~/src/serve.py` and `deploy/income-api.service` to
-   `/etc/systemd/system/income-api.service`. Replace `ubuntu` in the service file
-   if the VM uses another user. Run `sudo systemctl daemon-reload` and
-   `sudo systemctl enable --now income-api`.
-4. Add six GitHub Actions repository secrets:
+Required repository secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+`ARTIFACT_BUCKET`, `SERVER_HOST`, `SERVER_USER`, and `SERVER_SSH_KEY`. Secret values
+must never be committed. The S3 writer key is used by GitHub Actions; the VM reads
+S3 using its instance role.
 
-   | Secret | Value |
-   |---|---|
-   | `AWS_ACCESS_KEY_ID` | S3 writer access key for the CI runner |
-   | `AWS_SECRET_ACCESS_KEY` | Matching secret key |
-   | `ARTIFACT_BUCKET` | `aitc-day21-trandainhan-2a202602642` |
-   | `SERVER_HOST` | VM public IP or DNS name |
-   | `SERVER_USER` | VM SSH user, normally `ubuntu` |
-   | `SERVER_SSH_KEY` | Private key whose public key is in VM `authorized_keys` |
+To check the deployed VM:
 
-The model is already available in S3. The workflow downloads DVC data during
-Train, checks positive-class F1, then publishes and deploys only after the gate
-passes. Test the VM with `GET /healthz` and `POST /score` on port 8080.
+```bash
+curl http://44.211.49.198:8080/healthz
+curl -X POST http://44.211.49.198:8080/score \
+  -H 'Content-Type: application/json' \
+  -d '{"features":[39,2,13,2,9,0,1,2174,0,40]}'
+```
+
+The VM, its public IPv4 address, and its 12 GiB gp3 disk can incur AWS charges
+while it exists. After grading, delete the `aitc-day21-income-api` CloudFormation
+stack and the imported `income-lab-deploy` EC2 key pair. Deleting the stack removes
+the lab VM, disk, role, and security group. Keep the DVC/model S3 bucket until the
+submission has been checked.

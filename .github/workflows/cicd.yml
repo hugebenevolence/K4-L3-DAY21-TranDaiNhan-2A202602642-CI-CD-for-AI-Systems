@@ -9,6 +9,7 @@ on:
       - 'tests/*.py'
       - 'params.yaml'
       - 'requirements.txt'
+      - 'deploy/**'
       - '.github/workflows/cicd.yml'
   workflow_dispatch:
 
