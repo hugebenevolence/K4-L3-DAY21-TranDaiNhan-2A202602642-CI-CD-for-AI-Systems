@@ -18,15 +18,13 @@
 | 2 | 50 | 0.05 | 2 | 0.6051 | 0.8460 |
 | 3 | 200 | 0.1 | 5 | **0.7149** | 0.8740 |
 
-**Bộ siêu tham số đã chọn:** `n_estimators=200`, `learning_rate=0.1`, `max_depth=5`.
-
-**Lý do:** Bộ thứ ba có F1 lớp dương cao nhất trên cùng holdout 500 mẫu và vượt ngưỡng 0.65. Bộ thứ nhất có accuracy cao hơn (0.8780) nhưng F1 thấp hơn, cho thấy accuracy chưa đủ để chọn mô hình cho lớp thiểu số. Tổ hợp 50 cây và learning rate 0.05 cho F1 thấp nhất; thí nghiệm chưa tách riêng tác động từng tham số.
+**Chọn bộ 3** vì F1 lớp dương cao nhất trên cùng holdout 500 mẫu và vượt ngưỡng 0.65. Bộ 1 có accuracy cao hơn nhưng F1 thấp hơn, nên không phù hợp làm mô hình cuối.
 
 ---
 
 ## 2. Vì Sao Ngưỡng Chất Lượng Đặt Trên F1 Chứ Không Phải Accuracy
 
-Khoảng 24,8% mẫu thuộc lớp thu nhập trên 50K. Mô hình luôn đoán thu nhập thấp vẫn đạt accuracy 0,752 nhưng F1 lớp dương bằng 0. F1 kết hợp precision và recall của lớp cần phát hiện, nên phát hiện cả dự đoán nhầm lẫn bỏ sót. Pipeline yêu cầu `f1_score(y_eval, predictions) >= 0.65`. Không dùng `average="weighted"` vì lớp đa số kéo điểm lên; `average="macro"` cũng không đo trực tiếp F1 của lớp dương.
+Chỉ 24,8% mẫu thuộc lớp thu nhập trên 50K. Mô hình luôn đoán thu nhập thấp vẫn đạt accuracy 0,752 nhưng F1 lớp dương bằng 0. F1 kết hợp precision và recall của lớp cần phát hiện, nên pipeline chặn triển khai khi `f1_score(y_eval, predictions) < 0.65`.
 
 ---
 
@@ -34,9 +32,10 @@ Khoảng 24,8% mẫu thuộc lớp thu nhập trên 50K. Mô hình luôn đoán 
 
 | Khó khăn | Nguyên nhân | Cách giải quyết |
 |---|---|---|
-| MLflow không khởi động | `setuptools` mới và SQLAlchemy 2.1 xung đột với MLflow 2.13. | Giới hạn `setuptools<81`, `sqlalchemy<2.1`; test và train đã qua. |
-| CSV không đưa trực tiếp vào Git | Dữ liệu cần phiên bản riêng. | Dùng DVC với S3; `dvc push` và `dvc status -c` thành công. |
-| CI chưa tới Release | Unit Test qua; Train dừng ở xác thực S3 vì thiếu GitHub Secrets; AWS từ chối quyền EC2. | Cần thêm secrets và VM rồi chạy lại pipeline. |
+| MLflow lỗi phụ thuộc | `setuptools` và SQLAlchemy mới xung đột MLflow 2.13. | Giới hạn `setuptools<81`, `sqlalchemy<2.1`. |
+| Dữ liệu lớn | CSV cần phiên bản riêng. | DVC đẩy dữ liệu lên S3; `dvc status -c` đồng bộ. |
+| Release chưa tới VM | AWS từ chối EC2; chưa có SSH key VM. | Ba job đầu đã qua, model ở S3; chờ VM/SSH. |
+| Thử Quality Gate | Cấu hình yếu đạt F1 0.6051. | Nhánh `quality-gate-proof` cho thấy Release bị bỏ qua. |
 
 ---
 
@@ -44,7 +43,7 @@ Khoảng 24,8% mẫu thuộc lớp thu nhập trên 50K. Mô hình luôn đoán 
 
 | | f1_score | accuracy |
 |---|---:|---:|
-| Bước 2 (chỉ `train_batch1`, chạy local) | 0.7149 | 0.8740 |
+| Bước 2 (chỉ `train_batch1`, chạy CI) | 0.7149 | 0.8740 |
 | Bước 3 (thêm `train_batch2`, chạy local) | 0.7354 | 0.8820 |
 
-**Nhận xét:** Tăng tập huấn luyện từ 22.361 lên 44.722 mẫu giúp F1 tăng 0.0205 và accuracy tăng 0.0080 trên cùng holdout. Đây là quan sát của lần chạy local, chưa chứng minh thêm dữ liệu luôn cải thiện mô hình. Cần đối chiếu với artifact CI sau khi cấu hình AWS Secrets.
+**Nhận xét:** Với 44.722 thay vì 22.361 mẫu, F1 tăng 0.0205 trên cùng holdout. Số Bước 2 từ CI; số Bước 3 mới đo local, cần đối chiếu sau commit dữ liệu. Thêm dữ liệu không đảm bảo điểm luôn tăng.
