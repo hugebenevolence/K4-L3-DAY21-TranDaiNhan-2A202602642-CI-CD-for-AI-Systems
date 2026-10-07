@@ -1,0 +1,15 @@
+[Unit]
+Description=Adult Income Inference API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+Environment=ARTIFACT_BUCKET=aitc-day21-trandainhan-2a202602642
+ExecStart=/home/ubuntu/income-api-venv/bin/python /home/ubuntu/src/serve.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

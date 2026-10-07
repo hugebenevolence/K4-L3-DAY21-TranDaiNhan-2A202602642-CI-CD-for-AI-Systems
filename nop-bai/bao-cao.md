@@ -1,103 +1,50 @@
 # Báo Cáo Lab Day 21 - CI/CD cho AI Systems
 
-<!--
-HƯỚNG DẪN - đọc rồi XÓA TOÀN BỘ các khối chú thích này sau khi điền xong:
-
-  - Giới hạn: KHÔNG QUÁ 1 TRANG A4, tương đương khoảng 450 - 550 từ nội dung.
-  - Chỉ điền vào các chỗ ___ và các ô trong bảng. Không thêm mục mới.
-  - Viết bằng câu hoàn chỉnh, không gạch đầu dòng cụt lủn.
-  - Kiểm tra độ dài sau khi đã xóa hết chú thích:
-        wc -w nop-bai/bao-cao.md
-    và xem trước bản in bằng cách mở file trên GitHub rồi Ctrl+P / Cmd+P.
--->
-
 | | |
 |---|---|
-| Họ và tên | ___ |
-| MSSV | ___ |
+| Họ và tên | Trần Đại Nhân |
+| MSSV | 2A202602642 |
 | Lớp / Khóa | K4 |
-| Repo GitHub | https://github.com/___/___ |
-| Ngày nộp | ___ |
+| Repo GitHub | https://github.com/hugebenevolence/K4-L3-DAY21-TranDaiNhan-2A202602642-CI-CD-for-AI-Systems |
+| Ngày nộp | 07/10/2026 |
 
 ---
 
 ## 1. Bộ Siêu Tham Số Đã Chọn và Lý Do
 
-<!-- Khoảng 120 - 150 từ. Điền kết quả thật từ MLflow UI ở Bước 1, tối thiểu 3 lần chạy. -->
-
 | Lần chạy | n_estimators | learning_rate | max_depth | f1_score | accuracy |
-|---|---|---|---|---|---|
-| 1 | ___ | ___ | ___ | ___ | ___ |
-| 2 | ___ | ___ | ___ | ___ | ___ |
-| 3 | ___ | ___ | ___ | ___ | ___ |
+|---|---:|---:|---:|---:|---:|
+| 1 | 100 | 0.1 | 3 | 0.7109 | 0.8780 |
+| 2 | 50 | 0.05 | 2 | 0.6051 | 0.8460 |
+| 3 | 200 | 0.1 | 5 | **0.7149** | 0.8740 |
 
-**Bộ siêu tham số đã chọn:** `n_estimators=___`, `learning_rate=___`, `max_depth=___`.
+**Bộ siêu tham số đã chọn:** `n_estimators=200`, `learning_rate=0.1`, `max_depth=5`.
 
-**Lý do:** ___
-
-<!--
-Trả lời trong phần Lý do:
-  - Vì sao bộ này tốt hơn các bộ còn lại (dựa trên f1_score, không phải accuracy)?
-  - Lần chạy có accuracy cao nhất có trùng với lần có f1_score cao nhất không?
-    Nếu không, điều đó nói lên điều gì?
-  - Bạn quan sát thấy đánh đổi nào giữa n_estimators và learning_rate?
--->
+**Lý do:** Bộ thứ ba có F1 lớp dương cao nhất trên cùng holdout 500 mẫu và vượt ngưỡng 0.65. Bộ thứ nhất có accuracy cao hơn (0.8780) nhưng F1 thấp hơn, cho thấy accuracy chưa đủ để chọn mô hình cho lớp thiểu số. Tổ hợp 50 cây và learning rate 0.05 cho F1 thấp nhất; thí nghiệm chưa tách riêng tác động từng tham số.
 
 ---
 
 ## 2. Vì Sao Ngưỡng Chất Lượng Đặt Trên F1 Chứ Không Phải Accuracy
 
-<!-- Khoảng 120 - 150 từ. -->
-
-___
-
-<!--
-Cần nêu được:
-  - Phân bố lớp của tập dữ liệu (tỷ lệ lớp thu nhập > 50K) và hệ quả của nó.
-  - Accuracy của một mô hình luôn trả lời "thu nhập thấp" là bao nhiêu, vì sao con số
-    đó gây hiểu nhầm.
-  - F1 của lớp dương đo điều gì mà accuracy không đo được.
-  - Vì sao KHÔNG dùng average="weighted" hay average="macro" khi gọi f1_score.
--->
+Khoảng 24,8% mẫu thuộc lớp thu nhập trên 50K. Mô hình luôn đoán thu nhập thấp vẫn đạt accuracy 0,752 nhưng F1 lớp dương bằng 0. F1 kết hợp precision và recall của lớp cần phát hiện, nên phát hiện cả dự đoán nhầm lẫn bỏ sót. Pipeline yêu cầu `f1_score(y_eval, predictions) >= 0.65`. Không dùng `average="weighted"` vì lớp đa số kéo điểm lên; `average="macro"` cũng không đo trực tiếp F1 của lớp dương.
 
 ---
 
 ## 3. Khó Khăn Gặp Phải và Cách Giải Quyết
 
-<!-- Nêu 2 - 3 khó khăn thật, mỗi ô một câu ngắn. -->
-
 | Khó khăn | Nguyên nhân | Cách giải quyết |
 |---|---|---|
-| ___ | ___ | ___ |
-| ___ | ___ | ___ |
-| ___ | ___ | ___ |
+| MLflow không khởi động | `setuptools` mới và SQLAlchemy 2.1 xung đột với MLflow 2.13. | Giới hạn `setuptools<81`, `sqlalchemy<2.1`; test và train đã qua. |
+| CSV không đưa trực tiếp vào Git | Dữ liệu cần phiên bản riêng. | Dùng DVC với S3; `dvc push` và `dvc status -c` thành công. |
+| Chưa có Release trên VM | AWS từ chối quyền EC2; fork chưa chạy Actions. | Chờ quyền EC2 và bật Actions/Secrets để chạy pipeline. |
 
 ---
 
-## 4. So Sánh Bước 2 và Bước 3 (bắt buộc, 2 - 3 câu)
-
-<!-- Lấy số liệu từ bảng ở mục 3.6 của tasks/buoc-3.md. -->
+## 4. So Sánh Bước 2 và Bước 3
 
 | | f1_score | accuracy |
-|---|---|---|
-| Bước 2 (chỉ `train_batch1`) | ___ | ___ |
-| Bước 3 (thêm `train_batch2`) | ___ | ___ |
+|---|---:|---:|
+| Bước 2 (chỉ `train_batch1`, chạy local) | 0.7149 | 0.8740 |
+| Bước 3 (thêm `train_batch2`, chạy local) | 0.7354 | 0.8820 |
 
-**Nhận xét:** ___
-
-<!--
-Một câu trả lời trung thực kiểu "f1 giảm 0,01 vì dữ liệu mới cùng phân phối, không mang
-thêm thông tin mới" được đánh giá cao hơn kết luận sai rằng thêm dữ liệu luôn tốt hơn.
--->
-
----
-
-## 5. Phần Bonus Đã Thực Hiện (nếu có)
-
-<!-- Xóa cả mục 5 nếu không làm bonus. Mỗi bonus tối đa 1 dòng. -->
-
-- [ ] Bonus 1 - Tracking MLflow từ xa với DagsHub: ___
-- [ ] Bonus 2 - Điều chỉnh ngưỡng quyết định: ___
-- [ ] Bonus 3 - Báo cáo precision / recall tự động: ___
-- [ ] Bonus 4 - Hoàn trả về phiên bản trước: ___
-- [ ] Bonus 5 - Cảnh báo lệch lạc dữ liệu: ___
+**Nhận xét:** Tăng tập huấn luyện từ 22.361 lên 44.722 mẫu giúp F1 tăng 0.0205 và accuracy tăng 0.0080 trên cùng holdout. Đây là quan sát của lần chạy local, chưa chứng minh thêm dữ liệu luôn cải thiện mô hình. Cần đối chiếu với artifact CI sau khi Actions được bật.
