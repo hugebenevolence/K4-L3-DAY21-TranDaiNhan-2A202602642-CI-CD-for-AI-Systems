@@ -36,7 +36,7 @@ Khoảng 24,8% mẫu thuộc lớp thu nhập trên 50K. Mô hình luôn đoán 
 |---|---|---|
 | MLflow không khởi động | `setuptools` mới và SQLAlchemy 2.1 xung đột với MLflow 2.13. | Giới hạn `setuptools<81`, `sqlalchemy<2.1`; test và train đã qua. |
 | CSV không đưa trực tiếp vào Git | Dữ liệu cần phiên bản riêng. | Dùng DVC với S3; `dvc push` và `dvc status -c` thành công. |
-| Chưa có Release trên VM | AWS từ chối quyền EC2; fork chưa chạy Actions. | Chờ quyền EC2 và bật Actions/Secrets để chạy pipeline. |
+| CI chưa tới Release | Unit Test qua; Train dừng ở xác thực S3 vì thiếu GitHub Secrets; AWS từ chối quyền EC2. | Cần thêm secrets và VM rồi chạy lại pipeline. |
 
 ---
 
@@ -47,4 +47,4 @@ Khoảng 24,8% mẫu thuộc lớp thu nhập trên 50K. Mô hình luôn đoán 
 | Bước 2 (chỉ `train_batch1`, chạy local) | 0.7149 | 0.8740 |
 | Bước 3 (thêm `train_batch2`, chạy local) | 0.7354 | 0.8820 |
 
-**Nhận xét:** Tăng tập huấn luyện từ 22.361 lên 44.722 mẫu giúp F1 tăng 0.0205 và accuracy tăng 0.0080 trên cùng holdout. Đây là quan sát của lần chạy local, chưa chứng minh thêm dữ liệu luôn cải thiện mô hình. Cần đối chiếu với artifact CI sau khi Actions được bật.
+**Nhận xét:** Tăng tập huấn luyện từ 22.361 lên 44.722 mẫu giúp F1 tăng 0.0205 và accuracy tăng 0.0080 trên cùng holdout. Đây là quan sát của lần chạy local, chưa chứng minh thêm dữ liệu luôn cải thiện mô hình. Cần đối chiếu với artifact CI sau khi cấu hình AWS Secrets.
